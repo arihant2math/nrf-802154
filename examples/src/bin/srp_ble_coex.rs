@@ -234,14 +234,17 @@ async fn main(spawner: Spawner) {
 /// so the SoftDevice Controller is continuously requesting MPSL time alongside
 /// the 802.15.4 radio.
 async fn pin_ble(controller: sdc::SoftdeviceController<'_>, address: Address) -> ! {
-    let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
-        HostResources::new();
-    let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
-    let Host {
-        mut peripheral,
-        runner,
-        ..
-    } = stack.build();
+    let mut resources: HostResources<
+        sdc::SoftdeviceController<'_>,
+        DefaultPacketPool,
+        CONNECTIONS_MAX,
+        L2CAP_CHANNELS_MAX,
+    > = HostResources::new();
+    let stack = trouble_host::new(controller, &mut resources)
+        .set_random_address(address)
+        .build();
+    let runner = stack.runner();
+    let mut peripheral = stack.peripheral();
 
     let ble_bg = async {
         let mut runner = runner;

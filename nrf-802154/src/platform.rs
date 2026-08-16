@@ -185,10 +185,10 @@ extern "C" fn nrf_802154_hp_timer_init() {
     let timer = hp_timer();
     timer
         .mode()
-        .write(|w| w.set_mode(pac::timer::vals::Mode::TIMER));
+        .write(|w| w.set_mode(pac::timer::vals::Mode::Timer));
     timer
         .bitmode()
-        .write(|w| w.set_bitmode(pac::timer::vals::Bitmode::_32BIT));
+        .write(|w| w.set_bitmode(pac::timer::vals::Bitmode::_32bit));
     // Prescaler = 4 -> 16 MHz / 2^4 = 1 MHz -> 1µs resolution
     timer.prescaler().write(|w| w.set_prescaler(4));
 }

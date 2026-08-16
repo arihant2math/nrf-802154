@@ -508,6 +508,7 @@ impl<'d> Radio<'d> {
                 use_metadata_value: false,
                 channel: 0,
             },
+            tx_timestamp_encode: false,
         };
 
         // nrf_802154_transmit_raw uses TERM_NONE, which cannot abort in-progress
@@ -518,7 +519,8 @@ impl<'d> Radio<'d> {
         // the C driver's state machine to advance and complete the blocking operation.
         let mut scheduled = false;
         for _ in 0..TRANSMIT_SCHEDULE_RETRIES {
-            scheduled = unsafe { raw::nrf_802154_transmit_raw(packet_data, &metadata) };
+            scheduled = unsafe { raw::nrf_802154_transmit_raw(packet_data, &metadata) }
+                == raw::NRF_802154_TX_ERROR_NONE as raw::nrf_802154_tx_error_t;
             if scheduled {
                 break;
             }
@@ -616,6 +618,7 @@ impl<'d> Radio<'d> {
                 use_metadata_value: false,
                 channel: 0,
             },
+            tx_timestamp_encode: false,
         };
 
         // Same scheduling-retry as `transmit()`: `nrf_802154_transmit_csma_ca_raw`
@@ -627,7 +630,8 @@ impl<'d> Radio<'d> {
         // which is fatal for the back-to-back fragments of large frames.
         let mut scheduled = false;
         for _ in 0..TRANSMIT_SCHEDULE_RETRIES {
-            scheduled = unsafe { raw::nrf_802154_transmit_csma_ca_raw(packet_data, &metadata) };
+            scheduled = unsafe { raw::nrf_802154_transmit_csma_ca_raw(packet_data, &metadata) }
+                == raw::NRF_802154_TX_ERROR_NONE as raw::nrf_802154_tx_error_t;
             if scheduled {
                 break;
             }
