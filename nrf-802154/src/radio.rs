@@ -74,6 +74,74 @@ impl From<raw::nrf_802154_tx_error_t> for TxError {
     }
 }
 
+/// When a reception requests the medium from the coexistence arbiter
+/// (`nrf_802154_coex_rx_request_mode_t`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum CoexRxRequestMode {
+    /// As soon as energy is detected on the channel.
+    EnergyDetection,
+    /// When a preamble is received.
+    Preamble,
+    /// Once the frame is known to be addressed to this device.
+    Destined,
+}
+
+impl CoexRxRequestMode {
+    fn to_raw(self) -> raw::nrf_802154_coex_rx_request_mode_t {
+        (match self {
+            Self::EnergyDetection => raw::NRF_802154_COEX_RX_REQUEST_MODE_ENERGY_DETECTION,
+            Self::Preamble => raw::NRF_802154_COEX_RX_REQUEST_MODE_PREAMBLE,
+            Self::Destined => raw::NRF_802154_COEX_RX_REQUEST_MODE_DESTINED,
+        }) as _
+    }
+
+    fn from_raw(raw: raw::nrf_802154_coex_rx_request_mode_t) -> Option<Self> {
+        match raw as u32 {
+            raw::NRF_802154_COEX_RX_REQUEST_MODE_ENERGY_DETECTION => Some(Self::EnergyDetection),
+            raw::NRF_802154_COEX_RX_REQUEST_MODE_PREAMBLE => Some(Self::Preamble),
+            raw::NRF_802154_COEX_RX_REQUEST_MODE_DESTINED => Some(Self::Destined),
+            _ => None,
+        }
+    }
+}
+
+/// When a transmission requests the medium from the coexistence arbiter
+/// (`nrf_802154_coex_tx_request_mode_t`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum CoexTxRequestMode {
+    /// As soon as the frame is ready to transmit, covering CCA and the frame.
+    FrameReady,
+    /// Right before CCA starts.
+    CcaStart,
+    /// Only after CCA reports an idle channel.
+    CcaDone,
+    /// Before CCA, releasing the request again if CCA reports a busy channel.
+    OnCcaToggle,
+}
+
+impl CoexTxRequestMode {
+    fn to_raw(self) -> raw::nrf_802154_coex_tx_request_mode_t {
+        (match self {
+            Self::FrameReady => raw::NRF_802154_COEX_TX_REQUEST_MODE_FRAME_READY,
+            Self::CcaStart => raw::NRF_802154_COEX_TX_REQUEST_MODE_CCA_START,
+            Self::CcaDone => raw::NRF_802154_COEX_TX_REQUEST_MODE_CCA_DONE,
+            Self::OnCcaToggle => raw::NRF_802154_COEX_TX_REQUEST_MODE_ON_CCA_TOGGLE,
+        }) as _
+    }
+
+    fn from_raw(raw: raw::nrf_802154_coex_tx_request_mode_t) -> Option<Self> {
+        match raw as u32 {
+            raw::NRF_802154_COEX_TX_REQUEST_MODE_FRAME_READY => Some(Self::FrameReady),
+            raw::NRF_802154_COEX_TX_REQUEST_MODE_CCA_START => Some(Self::CcaStart),
+            raw::NRF_802154_COEX_TX_REQUEST_MODE_CCA_DONE => Some(Self::CcaDone),
+            raw::NRF_802154_COEX_TX_REQUEST_MODE_ON_CCA_TOGGLE => Some(Self::OnCcaToggle),
+            _ => None,
+        }
+    }
+}
+
 /// Radio error
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -468,6 +536,34 @@ impl<'d> Radio<'d> {
                 raw::nrf_802154_pending_bit_for_addr_clear(addr.as_ptr(), true)
             }
         }
+    }
+
+    /// Set when a reception asks the coexistence arbiter for the medium.
+    ///
+    /// Only meaningful once a coexistence interface is installed on the MPSL
+    /// instance (`MultiprotocolServiceLayer::set_coex_interface`); without one
+    /// MPSL grants every request. Returns `false` if the driver does not
+    /// support `mode`.
+    pub fn set_coex_rx_request_mode(&mut self, mode: CoexRxRequestMode) -> bool {
+        unsafe { raw::nrf_802154_coex_rx_request_mode_set(mode.to_raw()) }
+    }
+
+    /// The current [`CoexRxRequestMode`].
+    pub fn coex_rx_request_mode(&self) -> Option<CoexRxRequestMode> {
+        CoexRxRequestMode::from_raw(unsafe { raw::nrf_802154_coex_rx_request_mode_get() })
+    }
+
+    /// Set when a transmission asks the coexistence arbiter for the medium.
+    ///
+    /// See [`set_coex_rx_request_mode`](Self::set_coex_rx_request_mode).
+    /// Returns `false` if the driver does not support `mode`.
+    pub fn set_coex_tx_request_mode(&mut self, mode: CoexTxRequestMode) -> bool {
+        unsafe { raw::nrf_802154_coex_tx_request_mode_set(mode.to_raw()) }
+    }
+
+    /// The current [`CoexTxRequestMode`].
+    pub fn coex_tx_request_mode(&self) -> Option<CoexTxRequestMode> {
+        CoexTxRequestMode::from_raw(unsafe { raw::nrf_802154_coex_tx_request_mode_get() })
     }
 
     /// Empty both (short and extended) ACK pending-bit lists.
