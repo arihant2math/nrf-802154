@@ -6,6 +6,20 @@
 use std::env;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
+use std::process::Command;
+
+/// Resolves an LLVM binary shipped in the rustc sysroot for the host triple
+/// (the `llvm-tools` rustup component).
+fn llvm_tool(name: &str) -> PathBuf {
+    let sysroot = Command::new(env::var("RUSTC").unwrap_or_else(|_| "rustc".into()))
+        .args(["--print", "sysroot"])
+        .output()
+        .expect("rustc sysroot");
+    PathBuf::from(String::from_utf8(sysroot.stdout).unwrap().trim()).join(format!(
+        "lib/rustlib/{}/bin/{name}",
+        env::var("HOST").unwrap()
+    ))
+}
 
 enum Series {
     Nrf52,
@@ -303,7 +317,25 @@ fn build(target: &Target) {
     // upstream tree — which declares no `cmake_minimum_required()`/`project()`
     // of its own, being meant for inclusion in a Zephyr build — as a
     // subdirectory. See the comments there.
-    cmake::Config::new("cmake")
+    let mut config = cmake::Config::new("cmake");
+    // The archives hold ELF objects, so they must be built by an ELF-aware
+    // archiver. Left to itself CMake picks the host `ar`, and on macOS that is
+    // Apple's, which silently writes empty (96-byte) archives for ELF members;
+    // the link then fails on every `nrf_802154_*` symbol. Use the `llvm-ar`
+    // from the Rust toolchain, and let it write the symbol index itself
+    // (`s`) in place of a separate `ranlib`.
+    let llvm_ar = llvm_tool("llvm-ar");
+    if llvm_ar.is_file() {
+        config
+            .define("CMAKE_AR", &llvm_ar)
+            .define("CMAKE_C_ARCHIVE_FINISH", "<CMAKE_AR> s <TARGET>")
+            .define("CMAKE_CXX_ARCHIVE_FINISH", "<CMAKE_AR> s <TARGET>");
+    } else if env::var("HOST").is_ok_and(|h| h.contains("apple")) {
+        println!(
+            "cargo:warning=llvm-ar not found in the Rust sysroot; Apple ar will produce empty archives. Run `rustup component add llvm-tools`."
+        );
+    }
+    config
         .define("CMAKE_BUILD_TYPE", "MinSizeRel")
         .define(
             "CMAKE_C_FLAGS",
