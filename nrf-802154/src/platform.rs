@@ -267,7 +267,7 @@ extern "C" fn nrf_802154_platform_sl_lptimer_critical_section_enter() {
 extern "C" fn nrf_802154_platform_sl_lptimer_critical_section_exit() {
     // Guard against underflow: if the counter is already 0, do nothing.
     // This prevents a C-side bug from wrapping to u32::MAX and permanently masking the IRQ.
-    let prev = LP_CRIT_SECT_CNT.fetch_update(Ordering::AcqRel, Ordering::Acquire, |v| {
+    let prev = LP_CRIT_SECT_CNT.try_update(Ordering::AcqRel, Ordering::Acquire, |v| {
         if v == 0 {
             None
         } else {
@@ -429,7 +429,7 @@ extern "C" fn nrf_802154_random_deinit() {}
 #[no_mangle]
 extern "C" fn nrf_802154_random_get() -> u32 {
     RANDOM_STATE
-        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |mut x| {
+        .try_update(Ordering::AcqRel, Ordering::Acquire, |mut x| {
             if x == 0 {
                 x = 0x12345678;
             }
